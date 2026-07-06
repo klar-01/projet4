@@ -19,27 +19,35 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh 'mvn -B clean compile'
+                // On se déplace dans le sous-dossier pour exécuter le build Maven
+                dir('projet03-jenkins-maven-tests') {
+                    sh 'mvn -B clean compile'
+                }
             }
         }
 
         stage('Test') {
             steps {
-                sh 'mvn -B test'
+                // On se déplace dans le sous-dossier pour exécuter les tests
+                dir('projet03-jenkins-maven-tests') {
+                    sh 'mvn -B test'
+                }
             }
             post {
                 always {
-                    // Publie le rapport JUnit (visible dans Blue Ocean -> onglet Tests)
-                    junit '**/target/surefire-reports/*.xml'
+                    // Recherche les rapports JUnit spécifiquement dans le sous-dossier du projet
+                    junit 'projet03-jenkins-maven-tests/target/surefire-reports/*.xml'
                 }
             }
         }
 
         stage('Package') {
             steps {
-                sh 'mvn -B package -DskipTests'
-                // Archive le JAR : telechargeable depuis la page du build / Blue Ocean
-                archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                dir('projet03-jenkins-maven-tests') {
+                    sh 'mvn -B package -DskipTests'
+                    // Archive le JAR depuis le bon dossier cible
+                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                }
             }
         }
 
@@ -48,15 +56,17 @@ pipeline {
                 // Analyse statique Checkstyle. catchError : une alerte de style
                 // ne doit pas faire echouer tout le pipeline.
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    sh 'mvn -B checkstyle:checkstyle'
-                    publishHTML(target: [
-                        reportDir: 'target/site',
-                        reportFiles: 'checkstyle.html',
-                        reportName: 'Checkstyle',
-                        keepAll: true,
-                        allowMissing: true,
-                        alwaysLinkToLastBuild: true
-                    ])
+                    dir('projet03-jenkins-maven-tests') {
+                        sh 'mvn -B checkstyle:checkstyle'
+                        publishHTML(target: [
+                            reportDir: 'target/site',
+                            reportFiles: 'checkstyle.html',
+                            reportName: 'Checkstyle',
+                            keepAll: true,
+                            allowMissing: true,
+                            alwaysLinkToLastBuild: true
+                        ])
+                    }
                 }
             }
         }
